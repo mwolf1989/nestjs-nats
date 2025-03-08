@@ -1,6 +1,6 @@
 {
   "name": "@mwolf1989/nestjs-nats",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A NestJS native module for NATS that supports both RPC and Publish/Subscribe messaging patterns",
   "author": "Marcel Wolf",
   "license": "MIT",
@@ -82,4 +82,4 @@
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
   }
-} 
+}
