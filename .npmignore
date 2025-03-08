@@ -1,0 +1,25 @@
+# source files
+src/
+examples/
+
+# config files
+tsconfig.json
+tsconfig.build.json
+.prettierrc
+.eslintrc.js
+.editorconfig
+jest.config.js
+.gitignore
+
+# tests
+test/
+**/*.spec.ts
+coverage/
+
+# docker
+docker-compose.yml
+
+# development
+.vscode/
+.idea/
+*.log 

@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  nats:
+    image: nats:latest
+    ports:
+      - "4222:4222"   # Client connections
+      - "8222:8222"   # HTTP monitoring port
+    command: ["-js", "-m", "8222"]  # Enable JetStream and monitoring
+    volumes:
+      - nats_data:/data
+
+volumes:
+  nats_data: 
