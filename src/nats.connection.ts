@@ -3,6 +3,8 @@ import { DiscoveryService, MetadataScanner } from '@nestjs/core';
 import { connect, ConnectionOptions, NatsConnection as NatsClient, RequestOptions, StringCodec, Subscription } from 'nats';
 import { NATS_MODULE_OPTIONS, NATS_SUBJECT_HANDLER, NATS_SUBSCRIBE_OPTIONS } from './constants';
 import { NatsModuleOptions } from './interfaces/nats-options.interface';
+import { NatsMessageData } from './interfaces/nats-message.interface';
+import { SubscriptionOptions } from './interfaces/nats-subscription.interface';
 
 @Injectable()
 export class NatsConnection implements OnModuleInit, OnApplicationShutdown {
@@ -67,7 +69,7 @@ export class NatsConnection implements OnModuleInit, OnApplicationShutdown {
    * @param options Subscription options
    * @returns Subscription
    */
-  subscribe(subject: string, options?: any): Subscription {
+  subscribe(subject: string, options?: SubscriptionOptions): Subscription {
     if (!this.client) {
       throw new Error('NATS client is not connected');
     }
@@ -83,7 +85,7 @@ export class NatsConnection implements OnModuleInit, OnApplicationShutdown {
    * @param subject The subject to publish to
    * @param data The data to publish
    */
-  publish(subject: string, data: any): void {
+  publish(subject: string, data: NatsMessageData | string | Uint8Array): void {
     if (!this.client) {
       throw new Error('NATS client is not connected');
     }
@@ -102,13 +104,13 @@ export class NatsConnection implements OnModuleInit, OnApplicationShutdown {
   }
 
   /**
-   * Request-reply pattern
+   * Send a request to a subject and wait for a response
    * @param subject The subject to send the request to
-   * @param data The data to send
+   * @param data The data to send with the request
    * @param options Request options
-   * @returns Promise with the response
+   * @returns Promise that resolves to the response
    */
-  async request<T = any>(subject: string, data: any, options?: Partial<RequestOptions>): Promise<T> {
+  async request<T = NatsMessageData>(subject: string, data: NatsMessageData | string | Uint8Array, options?: Partial<RequestOptions>): Promise<T> {
     if (!this.client) {
       throw new Error('NATS client is not connected');
     }
@@ -122,19 +124,19 @@ export class NatsConnection implements OnModuleInit, OnApplicationShutdown {
       payload = this.sc.encode(JSON.stringify(data));
     }
 
-    // Default options with a timeout of 20s if not provided
+    // Ensure we have the required timeout property set
     const requestOptions: RequestOptions = {
-      timeout: 20000,
+      timeout: 20000,  // Default timeout of 20 seconds
       ...options
     };
 
     const response = await this.client.request(subject, payload, requestOptions);
-    const decodedResponse = this.sc.decode(response.data);
+    const decoded = this.sc.decode(response.data);
     
     try {
-      return JSON.parse(decodedResponse) as T;
-    } catch (e) {
-      return decodedResponse as unknown as T;
+      return JSON.parse(decoded) as T;
+    } catch (error) {
+      return decoded as unknown as T;
     }
   }
 

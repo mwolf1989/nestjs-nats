@@ -17,12 +17,20 @@ export class JetStreamSubscriberService implements OnModuleInit {
   private async setupSubscriptions() {
     try {
       // Create a subscription with the durable consumer name
+      // Using the correct JetStream consumer options format
       const subscription = await this.jetStreamService.subscribe('orders.*', {
+        // Queue group for load balancing across multiple instances
         queue: 'orders-queue',
-        durable: this.CONSUMER_NAME,
-        deliverNew: true,
-        ackExplicit: true,
-        manualAck: true,
+        // Durable name for the consumer
+        durable_name: this.CONSUMER_NAME,
+        // Set ACK policy to explicit - this is required
+        ack_policy: 'explicit',
+        // Deliver new messages
+        deliver_policy: 'new',
+        // Flow control to not overload the consumer
+        flow_control: true,
+        // Ensure we don't lose messages by requiring acknowledgement
+        ack_wait: 30000000000, // 30 seconds in nanoseconds
       });
 
       // Process messages in the background

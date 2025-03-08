@@ -1,25 +1,45 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { JetStreamClient, JetStreamManager, StringCodec } from 'nats';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ConsumerOpts, JetStreamClient, JetStreamManager, PubAck, StreamConfig, StringCodec } from 'nats';
 import { NatsConnection } from '../nats.connection';
+import { JetStreamPublishOptions, JetStreamStreamOptions } from '../interfaces/jetstream-options.interface';
+import { NatsMessageData } from '../interfaces/nats-message.interface';
 
 @Injectable()
-export class JetStreamService {
+export class JetStreamService implements OnModuleInit {
   private readonly logger = new Logger(JetStreamService.name);
-  private jetStreamClient: JetStreamClient;
   private jetStreamManager: JetStreamManager;
+  private jetStreamClient: JetStreamClient;
   private readonly sc = StringCodec();
+  private connectionInitialized = false;
 
-  constructor(private readonly natsConnection: NatsConnection) {}
+  constructor(private readonly natsConnection: NatsConnection) {
+    // We'll let onModuleInit handle initialization instead
+  }
 
   /**
    * Initialize JetStream client and manager
+   * Called automatically during module initialization
    */
-  async init(): Promise<void> {
+  async init() {
     try {
-      const client = this.natsConnection.getClient();
-      this.jetStreamClient = client.jetstream();
+      let client;
+      try {
+        client = this.natsConnection.getClient();
+      } catch (error) {
+        this.logger.warn('NATS client is not yet connected. JetStream services will not be available initially.');
+        throw error;
+      }
+
+      if (!client) {
+        const error = new Error('NATS client is not available');
+        this.logger.warn('NATS client is not available. JetStream services will not be available initially.');
+        throw error;
+      }
+
       this.jetStreamManager = await client.jetstreamManager();
-      this.logger.log('JetStream service initialized');
+      this.jetStreamClient = client.jetstream();
+      this.connectionInitialized = true;
+      this.logger.log('JetStream initialized');
     } catch (error) {
       this.logger.error(`Failed to initialize JetStream: ${error.message}`, error.stack);
       throw error;
@@ -27,9 +47,21 @@ export class JetStreamService {
   }
 
   /**
+   * Automatically initialize when the module is initialized
+   */
+  async onModuleInit() {
+    await this.init();
+  }
+
+  /**
    * Get the JetStream client
+   * @returns The JetStream client
    */
   getJetStreamClient(): JetStreamClient {
+    if (!this.connectionInitialized) {
+      this.tryReconnect();
+    }
+    
     if (!this.jetStreamClient) {
       throw new Error('JetStream client is not initialized');
     }
@@ -38,8 +70,13 @@ export class JetStreamService {
 
   /**
    * Get the JetStream manager
+   * @returns The JetStream manager
    */
   getJetStreamManager(): JetStreamManager {
+    if (!this.connectionInitialized) {
+      this.tryReconnect();
+    }
+    
     if (!this.jetStreamManager) {
       throw new Error('JetStream manager is not initialized');
     }
@@ -47,41 +84,66 @@ export class JetStreamService {
   }
 
   /**
-   * Create a stream
-   * @param name Stream name
-   * @param subjects Subjects to include in the stream
-   * @param options Stream options
+   * Attempts to reconnect to NATS if not connected
+   * @private
    */
-  async createStream(name: string, subjects: string[], options?: any): Promise<void> {
+  private async tryReconnect() {
     try {
-      const jsm = this.getJetStreamManager();
-      await jsm.streams.add({
-        name,
-        subjects,
-        ...options,
-      });
-      this.logger.log(`Stream ${name} created with subjects: ${subjects.join(', ')}`);
+      await this.init();
     } catch (error) {
-      if (error.code === '400' && error.message.includes('stream name already in use')) {
-        this.logger.log(`Stream ${name} already exists`);
-      } else {
-        this.logger.error(`Failed to create stream ${name}: ${error.message}`, error.stack);
-        throw error;
-      }
+      this.logger.debug(`Reconnection attempt failed: ${error.message}`);
     }
   }
 
   /**
-   * Publish a message to JetStream
-   * @param subject Subject to publish to
-   * @param data Data to publish
-   * @param options Publish options
+   * Create a new stream
+   * @param name The name of the stream
+   * @param subjects The subjects to include in the stream
+   * @param options Additional stream configuration options
    */
-  async publish(subject: string, data: any, options?: any): Promise<any> {
+  async createStream(name: string, subjects: string[], options?: Partial<JetStreamStreamOptions>): Promise<void> {
     try {
-      const js = this.getJetStreamClient();
+      if (!this.jetStreamManager) {
+        await this.init();
+      }
+
+      // Convert our custom options to NATS StreamConfig format
+      const streamConfig: Partial<StreamConfig> = {
+        name,
+        subjects,
+      };
+
+      // Copy over any additional options
+      if (options) {
+        Object.keys(options).forEach(key => {
+          if (key !== 'name' && key !== 'subjects') {
+            streamConfig[key] = options[key];
+          }
+        });
+      }
+
+      await this.jetStreamManager.streams.add(streamConfig);
+      this.logger.log(`Stream created: ${name}`);
+    } catch (error) {
+      this.logger.error(`Failed to create stream: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  /**
+   * Publish a message to a JetStream subject
+   * @param subject The subject to publish to
+   * @param data The data to publish
+   * @param options Publish options
+   * @returns Promise with the publish acknowledgement
+   */
+  async publish(subject: string, data: NatsMessageData | string | Uint8Array, options?: JetStreamPublishOptions): Promise<PubAck> {
+    try {
+      if (!this.jetStreamClient) {
+        await this.init();
+      }
+
       let payload: Uint8Array;
-      
       if (typeof data === 'string') {
         payload = this.sc.encode(data);
       } else if (data instanceof Uint8Array) {
@@ -89,29 +151,33 @@ export class JetStreamService {
       } else {
         payload = this.sc.encode(JSON.stringify(data));
       }
-      
-      const ack = await js.publish(subject, payload, options);
+
+      const publishAck = await this.jetStreamClient.publish(subject, payload, options);
       this.logger.debug(`Published message to JetStream subject: ${subject}`);
-      return ack;
+      return publishAck;
     } catch (error) {
-      this.logger.error(`Failed to publish to JetStream subject ${subject}: ${error.message}`, error.stack);
+      this.logger.error(`Failed to publish message: ${error.message}`, error.stack);
       throw error;
     }
   }
 
   /**
    * Subscribe to a JetStream subject
-   * @param subject Subject to subscribe to
+   * @param subject The subject to subscribe to
    * @param options Subscription options
+   * @returns The subscription
    */
-  async subscribe(subject: string, options?: any) {
+  async subscribe(subject: string, options?: Record<string, unknown>) {
     try {
-      const js = this.getJetStreamClient();
-      const subscription = await js.subscribe(subject, options);
+      if (!this.jetStreamClient) {
+        await this.init();
+      }
+
+      const subscription = await this.jetStreamClient.subscribe(subject, options);
       this.logger.log(`Subscribed to JetStream subject: ${subject}`);
       return subscription;
     } catch (error) {
-      this.logger.error(`Failed to subscribe to JetStream subject ${subject}: ${error.message}`, error.stack);
+      this.logger.error(`Failed to subscribe: ${error.message}`, error.stack);
       throw error;
     }
   }

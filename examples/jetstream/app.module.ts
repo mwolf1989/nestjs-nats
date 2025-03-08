@@ -10,6 +10,10 @@ import { AppController } from './app.controller';
     NatsModule.register({
       connectionOptions: {
         servers: 'nats://localhost:4222',
+        reconnect: true,
+        reconnectTimeWait: 2000,
+        maxReconnectAttempts: 10,
+        timeout: 20000
       },
     }),
   ],

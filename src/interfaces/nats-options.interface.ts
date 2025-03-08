@@ -1,5 +1,6 @@
 import { ModuleMetadata, Type } from '@nestjs/common';
 import { ConnectionOptions } from 'nats';
+import { SubscriptionOptions } from './nats-subscription.interface';
 
 export interface NatsModuleOptions {
   /**
@@ -12,7 +13,7 @@ export interface NatsModuleOptions {
    */
   subjects?: {
     name: string;
-    options?: any;
+    options?: SubscriptionOptions;
   }[];
 
   /**
@@ -29,6 +30,6 @@ export interface NatsOptionsFactory {
 export interface NatsModuleAsyncOptions extends Pick<ModuleMetadata, 'imports'> {
   useExisting?: Type<NatsOptionsFactory>;
   useClass?: Type<NatsOptionsFactory>;
-  useFactory?: (...args: any[]) => Promise<NatsModuleOptions> | NatsModuleOptions;
-  inject?: any[];
+  useFactory?: (...args: unknown[]) => Promise<NatsModuleOptions> | NatsModuleOptions;
+  inject?: Array<Type<any> | string | symbol>;
 } 

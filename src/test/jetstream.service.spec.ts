@@ -101,8 +101,8 @@ describe('JetStreamService', () => {
   describe('subscribe', () => {
     it('should subscribe to a JetStream subject', async () => {
       await jetStreamService.init();
-      const subscription = await jetStreamService.subscribe('test.subject', { durable: 'test-consumer' });
-      expect(mockJetStreamClient.subscribe).toHaveBeenCalledWith('test.subject', { durable: 'test-consumer' });
+      const subscription = await jetStreamService.subscribe('test.subject', { durable_name: 'test-consumer' });
+      expect(mockJetStreamClient.subscribe).toHaveBeenCalledWith('test.subject', { durable_name: 'test-consumer' });
       expect(subscription).toBeDefined();
     });
   });
