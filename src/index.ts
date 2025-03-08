@@ -1,3 +1,5 @@
+import 'reflect-metadata';
+
 export * from './nats.module';
 export * from './nats.connection';
 export * from './interfaces/nats-options.interface';

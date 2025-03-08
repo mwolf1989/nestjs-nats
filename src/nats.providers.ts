@@ -4,10 +4,10 @@ import { NatsConnection } from './nats.connection';
 
 export const createNatsConnection = (): Provider => ({
   provide: NatsConnection,
-  useFactory: (options, discoveryService, metadataScanner) => {
+  useFactory: (options, discoveryService?, metadataScanner?) => {
     return new NatsConnection(options, discoveryService, metadataScanner);
   },
-  inject: ['NATS_MODULE_OPTIONS', DiscoveryService, MetadataScanner],
+  inject: ['NATS_MODULE_OPTIONS', { token: DiscoveryService, optional: true }, { token: MetadataScanner, optional: true }],
 });
 
 export const createNatsClient = (): Provider => ({

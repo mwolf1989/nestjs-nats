@@ -1,0 +1,12 @@
+{
+  "name": "nats-test-script",
+  "version": "1.0.0",
+  "description": "Test script for NATS",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "nats": "^2.15.1"
+  }
+} 

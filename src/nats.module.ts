@@ -4,10 +4,8 @@ import { NATS_MODULE_OPTIONS } from './constants';
 import { createNatsConnection } from './nats.providers';
 import { NatsConnection } from './nats.connection';
 import { JetStreamService } from './jetstream';
-import { DiscoveryModule } from '@nestjs/core';
 
 @Module({
-  imports: [DiscoveryModule],
   providers: [NatsConnection, JetStreamService],
   exports: [NatsConnection, JetStreamService],
 })
@@ -18,7 +16,6 @@ export class NatsModule {
   public static register(options: NatsModuleOptions): DynamicModule {
     return {
       module: NatsModule,
-      imports: [DiscoveryModule],
       providers: [
         {
           provide: NATS_MODULE_OPTIONS,
@@ -38,7 +35,7 @@ export class NatsModule {
   public static registerAsync(options: NatsModuleAsyncOptions): DynamicModule {
     return {
       module: NatsModule,
-      imports: [...(options.imports || []), DiscoveryModule],
+      imports: [...(options.imports || [])],
       providers: [
         ...this.createAsyncProviders(options),
         createNatsConnection(),

@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import { NatsSubscribe } from '../decorators/nats-subscribe.decorator';
 import { NATS_SUBJECT_HANDLER, NATS_SUBSCRIBE_OPTIONS } from '../constants';
 

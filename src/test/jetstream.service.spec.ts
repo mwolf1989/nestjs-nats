@@ -114,4 +114,155 @@ describe('JetStreamService', () => {
       expect(mockJetStreamManager.streams.delete).toHaveBeenCalledWith('test-stream');
     });
   });
+
+  describe('error handling', () => {
+    it('should throw an error when initialization fails', async () => {
+      const moduleRef = await Test.createTestingModule({
+        providers: [
+          JetStreamService,
+          {
+            provide: NatsConnection,
+            useValue: {
+              getClient: jest.fn().mockImplementation(() => {
+                throw new Error('Client not available');
+              }),
+            },
+          },
+        ],
+      }).compile();
+  
+      const jetStreamService = moduleRef.get<JetStreamService>(JetStreamService);
+      await expect(jetStreamService.init()).rejects.toThrow('Client not available');
+    });
+
+    it('should throw an error when accessing uninitialized jetstream client', async () => {
+      const moduleRef = await Test.createTestingModule({
+        providers: [
+          JetStreamService,
+          {
+            provide: NatsConnection,
+            useValue: mockNatsConnection,
+          },
+        ],
+      }).compile();
+  
+      const jetStreamService = moduleRef.get<JetStreamService>(JetStreamService);
+      expect(() => jetStreamService.getJetStreamClient()).toThrow('JetStream client is not initialized');
+    });
+
+    it('should throw an error when accessing uninitialized jetstream manager', async () => {
+      const moduleRef = await Test.createTestingModule({
+        providers: [
+          JetStreamService,
+          {
+            provide: NatsConnection,
+            useValue: mockNatsConnection,
+          },
+        ],
+      }).compile();
+  
+      const jetStreamService = moduleRef.get<JetStreamService>(JetStreamService);
+      expect(() => jetStreamService.getJetStreamManager()).toThrow('JetStream manager is not initialized');
+    });
+
+    it('should handle errors when creating a stream', async () => {
+      const moduleRef = await Test.createTestingModule({
+        providers: [
+          JetStreamService,
+          {
+            provide: NatsConnection,
+            useValue: mockNatsConnection,
+          },
+        ],
+      }).compile();
+  
+      const jetStreamService = moduleRef.get<JetStreamService>(JetStreamService);
+      await jetStreamService.init();
+  
+      const mockError = new Error('Failed to create stream');
+      mockJetStreamManager.streams.add.mockRejectedValueOnce(mockError);
+  
+      await expect(jetStreamService.createStream('test-stream', ['test.subject'])).rejects.toThrow('Failed to create stream');
+    });
+
+    it('should handle errors when publishing', async () => {
+      const moduleRef = await Test.createTestingModule({
+        providers: [
+          JetStreamService,
+          {
+            provide: NatsConnection,
+            useValue: mockNatsConnection,
+          },
+        ],
+      }).compile();
+  
+      const jetStreamService = moduleRef.get<JetStreamService>(JetStreamService);
+      await jetStreamService.init();
+  
+      const mockError = new Error('Failed to publish');
+      mockJetStreamClient.publish.mockRejectedValueOnce(mockError);
+  
+      await expect(jetStreamService.publish('test.subject', { test: 'data' })).rejects.toThrow('Failed to publish');
+    });
+
+    it('should handle errors when subscribing', async () => {
+      const moduleRef = await Test.createTestingModule({
+        providers: [
+          JetStreamService,
+          {
+            provide: NatsConnection,
+            useValue: mockNatsConnection,
+          },
+        ],
+      }).compile();
+  
+      const jetStreamService = moduleRef.get<JetStreamService>(JetStreamService);
+      await jetStreamService.init();
+  
+      const mockError = new Error('Failed to subscribe');
+      mockJetStreamClient.subscribe.mockRejectedValueOnce(mockError);
+  
+      await expect(jetStreamService.subscribe('test.subject')).rejects.toThrow('Failed to subscribe');
+    });
+
+    it('should handle errors when getting consumer info', async () => {
+      const moduleRef = await Test.createTestingModule({
+        providers: [
+          JetStreamService,
+          {
+            provide: NatsConnection,
+            useValue: mockNatsConnection,
+          },
+        ],
+      }).compile();
+  
+      const jetStreamService = moduleRef.get<JetStreamService>(JetStreamService);
+      await jetStreamService.init();
+  
+      const mockError = new Error('Failed to get consumer info');
+      mockJetStreamManager.consumers.info.mockRejectedValueOnce(mockError);
+  
+      await expect(jetStreamService.getConsumerInfo('test-stream', 'test-consumer')).rejects.toThrow('Failed to get consumer info');
+    });
+
+    it('should handle errors when deleting a stream', async () => {
+      const moduleRef = await Test.createTestingModule({
+        providers: [
+          JetStreamService,
+          {
+            provide: NatsConnection,
+            useValue: mockNatsConnection,
+          },
+        ],
+      }).compile();
+  
+      const jetStreamService = moduleRef.get<JetStreamService>(JetStreamService);
+      await jetStreamService.init();
+  
+      const mockError = new Error('Failed to delete stream');
+      mockJetStreamManager.streams.delete.mockRejectedValueOnce(mockError);
+  
+      await expect(jetStreamService.deleteStream('test-stream')).rejects.toThrow('Failed to delete stream');
+    });
+  });
 }); 

@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
 import { DiscoveryService, MetadataScanner } from '@nestjs/core';
-import { connect, ConnectionOptions, NatsConnection as NatsClient, StringCodec, Subscription } from 'nats';
+import { connect, ConnectionOptions, NatsConnection as NatsClient, RequestOptions, StringCodec, Subscription } from 'nats';
 import { NATS_MODULE_OPTIONS, NATS_SUBJECT_HANDLER, NATS_SUBSCRIBE_OPTIONS } from './constants';
 import { NatsModuleOptions } from './interfaces/nats-options.interface';
 
@@ -108,7 +108,7 @@ export class NatsConnection implements OnModuleInit, OnApplicationShutdown {
    * @param options Request options
    * @returns Promise with the response
    */
-  async request<T = any>(subject: string, data: any, options?: { timeout?: number }): Promise<T> {
+  async request<T = any>(subject: string, data: any, options?: Partial<RequestOptions>): Promise<T> {
     if (!this.client) {
       throw new Error('NATS client is not connected');
     }
@@ -122,7 +122,13 @@ export class NatsConnection implements OnModuleInit, OnApplicationShutdown {
       payload = this.sc.encode(JSON.stringify(data));
     }
 
-    const response = await this.client.request(subject, payload, options);
+    // Default options with a timeout of 20s if not provided
+    const requestOptions: RequestOptions = {
+      timeout: 20000,
+      ...options
+    };
+
+    const response = await this.client.request(subject, payload, requestOptions);
     const decodedResponse = this.sc.decode(response.data);
     
     try {
