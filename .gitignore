@@ -43,7 +43,6 @@ lerna-debug.log*
 # npm package files
 npm-debug.log
 .npm
-package-lock.json
 
 # Optional eslint cache
 .eslintcache
